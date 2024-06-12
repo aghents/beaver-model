@@ -80,23 +80,24 @@ to draw-river [start-x start-y river-width]
 end
 
 to go
-  ask hunters [
-    ;; Move forward
-    fd 0.05
-    ;; Look for the nearest beaver
-    let nearest-beaver min-one-of (beavers in-radius vision-range) [distance myself]
-    if nearest-beaver != nobody [
-      if [distance myself] of nearest-beaver <= 4 [
-        ;; If the nearest beaver is within hunting range, move towards it
-        set heading towards nearest-beaver
-        ;; Check if there is a beaver in front of the hunter
-        if any? beavers in-radius 0.05 [
-          ;; Hunt and kill the beaver
-          ask one-of beavers in-radius 0.05 [die]
-        ]
+ask hunters [
+  ;; Move forward
+  fd 0.05
+  ;; Look for the nearest beaver
+  let nearest-beaver min-one-of (beavers in-cone vision-range 90) [distance myself]
+  if nearest-beaver != nobody [
+    set heading towards nearest-beaver  ;; Move towards the nearest beaver
+    if [distance myself] of nearest-beaver <= 4 [
+      ;; If the nearest beaver is within hunting range, move towards it
+      set heading towards nearest-beaver
+      ;; Check if there is a beaver in front of the hunter
+      if any? beavers in-cone 1 90 [
+        ;; Hunt and kill the beaver
+        ask one-of beavers in-cone 1 90 [die]
       ]
     ]
   ]
+]
 
   ask beavers [
     if move-timer > 0 [
