@@ -3,43 +3,50 @@ breed [beavers beaver]
 
 turtles-own [vision-range move-timer kill-range target-beaver kill-timer]
 
-globals [max-water-patches current-water-patches]
+globals [max-water-patches current-water-patches river-x-positions beavers-killed]
 
 to setup
   clear-all
 
+   set beavers-killed 0
+
   ;; Set the background color to a brown earth color
-  ask patches [ set pcolor brown + 2 ]  ;; Choose an appropriate brown shade
+  ask patches [ set pcolor brown + 2 ]
 
   ;; Initialize water patches counter
   set max-water-patches count patches * 0.3
   set current-water-patches 0
 
   ;; Draw multiple small rivers
-  let num-rivers 4  ;; Increase the number of rivers
+  let num-rivers number_rivers
+  set river-x-positions []  ;; Initialize list to store river X positions
   repeat num-rivers [
     draw-river (random-xcor) max-pycor random 1 + 1
   ]
 
   ;; Create hunters
-  create-hunters 5 [
-    setxy random-xcor min-pycor  ;; Position each hunter at a random x-coordinate at the bottom of the screen
-    set color red                ;; Set the color of hunters to red
-    set heading 0                ;; Set the heading to 0 degrees (pointing upwards)
-    set vision-range 5           ;; Set the vision range for hunters
-    set kill-range 4             ;; Set the kill range for hunters
-    set kill-timer 0             ;; Initialize kill timer to 0
-  ]
+  create-hunters number_hunters [
+    let random-x-index random length river-x-positions
+    let random-x-position item random-x-index river-x-positions
+    ;; Introduce variabilidad aleatoria en la posición X
+    let random-offset (random-float 2.5) - 1.25  ;; Genera un número aleatorio entre -1.25 y 1.25
+    let final-x-position random-x-position + random-offset
+    setxy final-x-position min-pycor  ;; Posición del cazador con variabilidad aleatoria cerca de un río
+    set color red
+    set heading 0
+    set vision-range 5
+    set kill-range 4
+    set kill-timer 0]
 
   ;; Create beavers on water patches
-  let num-beavers 50
-  create-beavers num-beavers [
+
+  create-beavers number_beavers [
     let water-patch one-of patches with [pcolor = blue]
     if water-patch != nobody [
       move-to water-patch
-      set color brown  ;; Set the color of beavers to brown
-      set heading random 360  ;; Set the heading to a random direction
-      set move-timer random 50  ;; Initialize with a random value
+      set color brown
+      set heading random 360
+      set move-timer random 50
     ]
   ]
 
@@ -47,66 +54,56 @@ to setup
 end
 
 to draw-river [start-x start-y river-width]
-  ;; Draw a river with a random structure from the top to just above the bottom 10% of the screen
   let x start-x
   let y start-y
   let bottom-limit min-pycor + ((max-pycor - min-pycor) * 0.1)
   while [y >= bottom-limit and current-water-patches < max-water-patches] [
-    let pool? random 100 < 40  ;; 40% chance to create a pool at this segment
+    let pool? random 100 < 40
     ifelse pool? [
-      ;; Create a pool by widening the river
-      let pool-width random 2 + river-width  ;; Random width between river-width and river-width + 1
+      let pool-width random 2 + river-width
       ask patches with [pxcor >= x - pool-width and pxcor <= x + pool-width and pycor >= y - 1 and pycor <= y + 1] [
         if pcolor != blue [
           set pcolor blue
           set current-water-patches current-water-patches + 1
         ]
       ]
-      ;; Move down a few more patches to avoid overlapping pools
       set y y - 3
     ] [
-      ;; Regular river section
       ask patches with [pxcor >= x - river-width and pxcor <= x + river-width and pycor = y] [
         if pcolor != blue [
           set pcolor blue
           set current-water-patches current-water-patches + 1
         ]
       ]
-      ;; Randomly change the x-coordinate to give the river a meandering structure
       set x x + random 3 - 1
       if x > max-pxcor - river-width [ set x max-pxcor - river-width ]
       if x < min-pxcor + river-width [ set x min-pxcor + river-width ]
       set y y - 1
     ]
   ]
+  let river-center-x (max-pxcor + min-pxcor) / 2  ;; Calculate center of world in X axis
+  set river-x-positions lput x river-x-positions  ;; Add central X position of river to list
 end
 
 to go
   ask hunters [
-    ;; If kill timer is active, decrement it and kill the beaver if the timer has reached zero
     if kill-timer > 0 [
       set kill-timer kill-timer - 1
       if kill-timer = 0 and target-beaver != nobody [
         ask target-beaver [die]
-        set target-beaver nobody  ;; Clear the target
+        set beavers-killed beavers-killed + 1
+        set target-beaver nobody
       ]
     ]
-    ;; If no active kill timer, move forward and search for beavers
     if kill-timer = 0 [
       fd 0.05
-
-      ;; Look for the nearest beaver within vision range
       let nearest-beaver min-one-of (beavers in-cone vision-range 90) [distance myself]
-
       if nearest-beaver != nobody [
         if [distance myself] of nearest-beaver <= kill-range [
-          ;; If the nearest beaver is within kill range, start the kill timer
           set target-beaver nearest-beaver
-          set kill-timer 30  ;; 30 ticks = 3 seconds if each tick represents 0.1 seconds
+          set kill-timer 30
         ]
       ]
-
-      ;; Move towards the nearest beaver if not within kill range and the nearest beaver exists
       if nearest-beaver != nobody and [distance myself] of nearest-beaver > kill-range [
         set heading towards nearest-beaver
       ]
@@ -115,18 +112,15 @@ to go
 
   ask beavers [
     if move-timer > 0 [
-      ;; Continue moving in the current direction
       forward-slowly
-      set move-timer move-timer - 1  ;; Decrease the timer
+      set move-timer move-timer - 1
     ]
     if move-timer <= 0 [
-      ;; Change direction and reset the timer
       set heading random 360
-      set move-timer random 50  ;; Reset the timer to a random value
+      set move-timer random 50
     ]
-    ;; Ensure the beaver stays on blue patches (river patches)
     if pcolor != blue [
-      right 180  ;; Turn around
+      right 180
       forward-slowly
     ]
   ]
@@ -135,17 +129,17 @@ to go
 end
 
 to forward-slowly
-  fd 0.02  ;; Move forward slowly
+  fd 0.02
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-206
-10
-822
-627
+307
+13
+1085
+792
 -1
 -1
-18.42424242424243
+6.08
 1
 10
 1
@@ -155,21 +149,21 @@ GRAPHICS-WINDOW
 0
 0
 1
--16
-16
--16
-16
+-50
+50
+-50
+50
 1
 1
 1
 ticks
-30.0
+10.0
 
 BUTTON
-60
-60
-126
-93
+29
+347
+232
+381
 NIL
 setup
 NIL
@@ -183,10 +177,10 @@ NIL
 1
 
 BUTTON
-63
-114
-126
-147
+29
+569
+246
+603
 NIL
 go
 T
@@ -198,6 +192,122 @@ NIL
 NIL
 NIL
 1
+
+CHOOSER
+27
+160
+229
+205
+group_type
+group_type
+"two" "three"
+1
+
+TEXTBOX
+27
+57
+220
+91
+Parameters
+11
+0.0
+1
+
+MONITOR
+30
+439
+244
+484
+Beavers alive
+count beavers
+17
+1
+11
+
+MONITOR
+30
+502
+243
+547
+Beavers killed
+beavers-killed
+17
+1
+11
+
+TEXTBOX
+38
+412
+226
+435
+Monitor variables\n
+11
+0.0
+1
+
+PLOT
+313
+813
+1087
+1042
+Beavers per time
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"default" 1.0 0 -16777216 true "" "plot count beavers"
+"pen-1" 1.0 0 -16777216 true "" ""
+
+SLIDER
+25
+223
+230
+257
+number_rivers
+number_rivers
+0
+100
+12.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+27
+105
+230
+139
+number_hunters
+number_hunters
+0
+100
+12.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+27
+275
+236
+309
+number_beavers
+number_beavers
+0
+500
+171.0
+1
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
